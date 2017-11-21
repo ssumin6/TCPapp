@@ -1,3 +1,11 @@
 <resources>
     <string name="app_name">20160333_proj5</string>
+    <string name="text1">IP:</string>
+    <string name="text2">Port:</string>
+    <string name="text3">Key:</string>
+    <string name="text4">Output:</string>
+    <string name="button1">CHOOSE FILE ...</string>
+    <string name="button2">CONNECT</string>
+    <string name="radio1">Encrypt</string>
+    <string name="radio2">Decrypt</string>
 </resources>
