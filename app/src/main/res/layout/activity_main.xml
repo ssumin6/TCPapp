@@ -16,6 +16,7 @@
             android:layout_weight="0.2"
             android:text="@string/text1"></TextView>
         <EditText
+            android:id="@+id/edit1"
             android:layout_width="wrap_content"
             android:layout_height="match_parent"
             android:layout_weight="0.8"></EditText>
@@ -31,6 +32,7 @@
             android:layout_weight="0.2"
             android:text="@string/text2"></TextView>
         <EditText
+            android:id="@+id/edit2"
             android:layout_width="wrap_content"
             android:layout_height="match_parent"
             android:layout_weight="0.8"></EditText>
@@ -47,6 +49,7 @@
             android:layout_weight="0.2"
             android:text="@string/text3"></TextView>
         <EditText
+            android:id="@+id/edit3"
             android:layout_width="wrap_content"
             android:layout_height="match_parent"
             android:layout_weight="0.8"></EditText>
@@ -57,6 +60,7 @@
         android:orientation = "horizontal"
         >
         <RadioGroup
+            android:id="@+id/radio_group"
             android:layout_height="match_parent"
             android:layout_width="wrap_content"
             android:orientation="horizontal"
@@ -89,6 +93,7 @@
             android:layout_weight="0.2"
             android:text="@string/text4"></TextView>
         <EditText
+            android:id="@+id/edit4"
             android:layout_width="wrap_content"
             android:layout_height="match_parent"
             android:layout_weight="0.8"></EditText>
