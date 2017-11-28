@@ -66,10 +66,12 @@
             android:orientation="horizontal"
             android:layout_weight="0.7">
             <RadioButton
+                android:id="@+id/encrypt"
                 android:layout_width="wrap_content"
                 android:layout_height="match_parent"
                 android:text="@string/radio1"/>
             <RadioButton
+                android:id="@+id/decrypt"
                 android:layout_width="wrap_content"
                 android:layout_height="match_parent"
                 android:text="@string/radio2"/>
