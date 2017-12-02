@@ -13,13 +13,13 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="match_parent"
-            android:layout_weight="0.2"
+            android:gravity="center_vertical"
             android:text="@string/text1"></TextView>
+
         <EditText
             android:id="@+id/edit1"
             android:layout_width="wrap_content"
-            android:layout_height="match_parent"
-            android:layout_weight="0.8"></EditText>
+            android:layout_height="match_parent"></EditText>
     </LinearLayout>
     <LinearLayout
         android:layout_width = "match_parent"
@@ -29,13 +29,13 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="match_parent"
-            android:layout_weight="0.2"
+            android:gravity="center_vertical"
             android:text="@string/text2"></TextView>
+
         <EditText
             android:id="@+id/edit2"
             android:layout_width="wrap_content"
-            android:layout_height="match_parent"
-            android:layout_weight="0.8"></EditText>
+            android:layout_height="match_parent"></EditText>
     </LinearLayout>
 
     <LinearLayout
@@ -46,41 +46,41 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="match_parent"
-            android:layout_weight="0.2"
+            android:gravity="center_vertical"
             android:text="@string/text3"></TextView>
         <EditText
             android:id="@+id/edit3"
             android:layout_width="wrap_content"
-            android:layout_height="match_parent"
-            android:layout_weight="0.8"></EditText>
+            android:layout_height="match_parent"></EditText>
     </LinearLayout>
     <LinearLayout
         android:layout_width = "match_parent"
         android:layout_height = "wrap_content"
         android:orientation = "horizontal"
         >
+
         <RadioGroup
             android:id="@+id/radio_group"
-            android:layout_height="match_parent"
             android:layout_width="wrap_content"
-            android:orientation="horizontal"
-            android:layout_weight="0.7">
+            android:layout_height="match_parent"
+            android:orientation="horizontal">
+
             <RadioButton
                 android:id="@+id/encrypt"
                 android:layout_width="wrap_content"
                 android:layout_height="match_parent"
-                android:text="@string/radio1"/>
+                android:text="@string/radio1" />
+
             <RadioButton
                 android:id="@+id/decrypt"
                 android:layout_width="wrap_content"
                 android:layout_height="match_parent"
-                android:text="@string/radio2"/>
+                android:text="@string/radio2" />
         </RadioGroup>
         <Button
             android:id="@+id/button1"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="0.3"
             android:text="@string/button1"
             ></Button>
     </LinearLayout>
@@ -92,13 +92,12 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="match_parent"
-            android:layout_weight="0.2"
+            android:gravity="center_vertical"
             android:text="@string/text4"></TextView>
         <EditText
             android:id="@+id/edit4"
             android:layout_width="wrap_content"
-            android:layout_height="match_parent"
-            android:layout_weight="0.8"></EditText>
+            android:layout_height="match_parent"></EditText>
     </LinearLayout>
     <Button
         android:id="@+id/button2"
