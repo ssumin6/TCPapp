@@ -1,5 +1,6 @@
 package com.network.user.a20160333_proj5;
 
+import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.media.MediaScannerConnection;
@@ -16,17 +17,9 @@ import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.Toast;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.Writer;
 import java.net.Socket;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
@@ -37,7 +30,6 @@ public class MainActivity extends AppCompatActivity {
     final int file_choose = 101;
 
     String dest_IP, key, fo_name;
-    Uri file_path;
     int dest_port=-1;
     boolean crypt = true; // true is encryption, false is decryption
     byte[] buf = new byte[1024000];
@@ -87,6 +79,7 @@ public class MainActivity extends AppCompatActivity {
                 Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
                 intent.addCategory(Intent.CATEGORY_OPENABLE);
                 intent.setType("*/*");
+                intent = Intent.createChooser(intent, "Choose a file");
                 startActivityForResult(intent, file_choose);
             }
         });
@@ -123,6 +116,7 @@ public class MainActivity extends AppCompatActivity {
 //                        e.printStackTrace();
 //                    }
 //                }
+                Toast.makeText(getApplicationContext(), ""+buf,Toast.LENGTH_SHORT).show();
                 if (dest_IP.equals("") || dest_port==-1||key.equals("")||fo_name.equals("")){
                     Toast.makeText(getApplicationContext(),"Fill in Everything",Toast.LENGTH_SHORT).show();
                 }else {
@@ -136,25 +130,26 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data){
+        final ContentResolver contentResolver = getContentResolver();
+
         switch(requestCode){
             case file_choose:
                 if (resultCode == RESULT_OK){
-                    String file_path = data.getData().getPath();
-                    try {//계속 여기서 filenotfound exception 일어남
-                        File open_file = new File(file_path);
-                        FileInputStream is = new FileInputStream(open_file);
-                        int tmp;
-                        while((tmp = is.read(buf))>=0){
-                            buf_size += tmp;
+                    final Uri uri = data!=null?data.getData():null;
+                    if (uri ==null){
+                        Log.d("URI","Nothing");
+                        return;
+                    }
+                    InputStream is = null;
+                    try {
+                        is = contentResolver.openInputStream(uri);
+                        int read;
+                        while((read=is.read(buf))>0){
+                            buf_size += read;
                         }
-                        is.close();
-                    }catch(FileNotFoundException e){
-                        e.printStackTrace();
-                    }catch(IOException e){
+                    } catch (Exception e) {
                         e.printStackTrace();
                     }
-
-                    Toast.makeText(getApplicationContext(), "File Selection Succeed\nChoosen File : "+file_path,Toast.LENGTH_SHORT).show();
                 }
                 break;
         }
@@ -192,7 +187,7 @@ class SendTask extends AsyncTask<Void, Void, Void>{
         int sum = 0;
 
         int i;
-        for(i=0; i<buf.length; i+=2){
+        for(i=0; i<buf.length-1; i+=2){
             data = ((buf[i]&0xff)<<8)|(buf[i+1]&0xff);
             sum += data;
             if ((sum>>16)>0){
@@ -200,7 +195,7 @@ class SendTask extends AsyncTask<Void, Void, Void>{
             }
         }
         if (buf.length%2==1) {
-            data = (buf[i]&0xff)<<8;
+            data = (buf[i-1]&0xff)<<8;
             sum += data;
             if ((sum>>16)>0){
                 sum = sum&0xffff +(sum >>16);
@@ -240,12 +235,7 @@ class SendTask extends AsyncTask<Void, Void, Void>{
             buf = headerBuffer.array();
             //checksum calculation
             checksum = getChecksum(buf);
-            Log.d("CHKSUM", "calculated value : "+checksum);
             headerBuffer.putShort(2,checksum);//put checksum at 2bytes.
-
-            chkvalue = getChecksum(headerBuffer.array());
-
-            Log.d("CHKSUM",""+chkvalue);
 
             //start outputStream
             OutputStream outputStream= socket.getOutputStream();
