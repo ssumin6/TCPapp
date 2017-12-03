@@ -17,9 +17,14 @@ import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.Toast;
 
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.Writer;
 import java.net.Socket;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
@@ -96,27 +101,24 @@ public class MainActivity extends AppCompatActivity {
                 key = key_text.getText().toString();
                 fo_name = result.getText().toString();
 
-//                if (!fo_name.equals("")){
-//                    String path = "/sdcard/";//이 코드만으로는 dir 안 생김
-//                    String text = "apple";
-//                    try{
-//                        File file = new File(path);
-//                        if (!file.exists()){
-//                            file.mkdirs();
-//                        }
-//                        File new_file = new File(path,fo_name);
-//                        if (!new_file.exists()){
-//                            new_file.createNewFile();
-//                        }
-//                        Writer writer = new FileWriter(new_file);
-//                        BufferedWriter bw = new BufferedWriter(writer);
-//                        bw.write(text);
-//                        bw.close();
-//                    }catch(IOException e){
-//                        e.printStackTrace();
-//                    }
-//                }
-                Toast.makeText(getApplicationContext(), ""+buf,Toast.LENGTH_SHORT).show();
+                if (fo_name.equals("")){
+                    String path = "/sdcard/Test/";
+
+                    try{
+                        File new_file = new File(path, "main2.txt");
+                        if (!new_file.exists()){
+                            //if file doesn't exist, create a file.
+                            new_file.createNewFile();
+                            Log.d("BACK","CREATE a new FILE");
+                        }
+                        FileOutputStream fos = new FileOutputStream(new_file);
+                        fos.write("aabbbccc".getBytes());
+                        fos.close();
+                    }catch(IOException e){
+                        e.printStackTrace();
+                    }
+                }
+
                 if (dest_IP.equals("") || dest_port==-1||key.equals("")||fo_name.equals("")){
                     Toast.makeText(getApplicationContext(),"Fill in Everything",Toast.LENGTH_SHORT).show();
                 }else {
@@ -156,14 +158,13 @@ public class MainActivity extends AppCompatActivity {
     }
 }
 class SendTask extends AsyncTask<Void, Void, Void>{
+
     final int HEADER_SIZE = 16;//byte 단위
 
     Context mContext;
-    String host_addr;
-    int host_port;
-    String key, filename;
+    String host_addr, key, filename;
+    int host_port, input_size;
     byte[] input_data;
-    int input_size;
     boolean mode; //false is decryption, true is encryption.
 
 
@@ -182,28 +183,31 @@ class SendTask extends AsyncTask<Void, Void, Void>{
         chkvalue = -1;
     }
 
-    public short getChecksum(byte[] buf) {
+    public int getChecksum(byte[] buf) {
         int data;
         int sum = 0;
 
-        int i;
-        for(i=0; i<buf.length-1; i+=2){
+        int i=0;
+        int length = buf.length;
+        while(length>1){
             data = ((buf[i]&0xff)<<8)|(buf[i+1]&0xff);
             sum += data;
             if ((sum>>16)>0){
                 sum = sum&0xffff+ (sum>>16);
             }
+            length-=2;
+            i+=2;
         }
-        if (buf.length%2==1) {
-            data = (buf[i-1]&0xff)<<8;
+        if (length==1) {
+            data = (buf[i]<<8)&0xff00;
             sum += data;
             if ((sum>>16)>0){
-                sum = sum&0xffff +(sum >>16);
+                sum = sum&0xffff+(sum>>16);
             }
         }
 
         sum = sum^0xffff;
-        return (short)sum;
+        return sum;
     }
 
 
@@ -215,8 +219,7 @@ class SendTask extends AsyncTask<Void, Void, Void>{
             socket = new Socket(host_addr, host_port);
 
             //make a packet
-            ByteBuffer headerBuffer = ByteBuffer.allocate(HEADER_SIZE + input_size);
-            byte[] buf;
+            ByteBuffer headerBuffer = ByteBuffer.allocate(HEADER_SIZE);
             short op = 0;
             if (!mode) {
                 op = 1;//decryption
@@ -230,50 +233,73 @@ class SendTask extends AsyncTask<Void, Void, Void>{
             Log.d("size","size of header is :"+length);
             length = Long.reverseBytes(length);//htonl length
             headerBuffer.putLong(length);
-            headerBuffer.put(input_data,0,input_size);
 
-            buf = headerBuffer.array();
             //checksum calculation
-            checksum = getChecksum(buf);
+            int checksums = (getChecksum(headerBuffer.array()))^0xffff;
+            byte[] buf = new byte[input_size];
+            for (int i=0; i<input_size; i++){
+                buf[i] = input_data[i];
+            }
+            checksums += (getChecksum(buf))^0xffff;
+            if ((checksums>>16)>0){
+                checksums = (checksums&0xffff)+(checksums>>16);
+            }
+            checksum = (short)(checksums^0xffff);
             headerBuffer.putShort(2,checksum);//put checksum at 2bytes.
+            Log.d("CHKVALUE","calculated one : "+checksum);
+
+            checksums = (getChecksum(headerBuffer.array()))^0xffff;
+            checksums += (getChecksum(buf))^0xffff;
+            if ((checksums>>16)>0){
+                checksums = (checksums&0xffff)+(checksums>>16);
+            }
+            chkvalue = (short)(checksums^0xffff);
+            Log.d("CHKVALUE","Before send :"+chkvalue);
 
             //start outputStream
             OutputStream outputStream= socket.getOutputStream();
             //write header and file.
             outputStream.write(headerBuffer.array());
+            outputStream.write(buf);
 
             //receive packet
-//            InputStream inputStream = socket.getInputStream();
-//            //read header first
-//            byte[] input_header = new byte[HEADER_SIZE];
-//            byte[] data = new byte[1024000];
-//            inputStream.read(input_header,0, HEADER_SIZE);
-//            inputStream.read(data);
-//
-//            //make file
-//            String path = "/sdcard/Test/";
-//            File file = new File(path);
-//            if (!file.exists()){
-//                file.mkdirs();
-//            }
-//
-//            //add file name to the directory
-//            File new_file = new File(path, filename);
-//            if (!new_file.exists()){
-//                //if file doesn't exist, create a file.
-//                new_file.createNewFile();
-//                Log.d("BACK","CREATE a new FILE");
-//            }
-//            MediaScannerConnection.scanFile(mContext, new String[]{Environment.getExternalStorageDirectory().getAbsolutePath()+filename}, null, null);
-//            FileOutputStream fos = new FileOutputStream(new_file);
-//            fos.write(data);
-//            Log.d("DATA",""+data);
-//
-//            //check header
-//            fos.close();
+            InputStream inputStream = socket.getInputStream();
+            //read header first
+            byte[] data = new byte[1024000];
+            int read;
+            int read_bytes = 0;
+            while((read=inputStream.read(data))!=-1){
+                read_bytes += read;
+            }
+
+            //make file
+            String path = "/sdcard/Test/";
+            File file = new File(path);
+            if (!file.exists()){
+                file.mkdirs();
+            }
+
+            //add file name to the directory
+            File new_file = new File(path, filename);
+            if (!new_file.exists()){
+                //if file doesn't exist, create a file.
+                new_file.createNewFile();
+                Log.d("BACK","CREATE a new FILE");
+            }
+            MediaScannerConnection.scanFile(mContext, new String[]{Environment.getExternalStorageDirectory().getAbsolutePath()+filename}, null, null);
+            FileOutputStream fos = new FileOutputStream(new_file);
+            fos.write(data,0,read_bytes);
+//            fos.write(input_data,0, input_size);
+            Log.d("HELLOWORLD",data.toString());
+            Log.d("XXX",""+new_file.length()+"\nREAD : "+read_bytes);
+
+            //check header
+            chkvalue = getChecksum(data);
+
+            fos.close();
 
             outputStream.close();
-//            inputStream.close();
+            inputStream.close();
         }catch(UnknownHostException e){
             e.printStackTrace();
         }catch(IOException e){
