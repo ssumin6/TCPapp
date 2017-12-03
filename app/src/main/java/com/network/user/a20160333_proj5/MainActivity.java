@@ -17,14 +17,11 @@ import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.Toast;
 
-import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.Writer;
 import java.net.Socket;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
@@ -100,24 +97,6 @@ public class MainActivity extends AppCompatActivity {
                 }
                 key = key_text.getText().toString();
                 fo_name = result.getText().toString();
-
-                if (fo_name.equals("")){
-                    String path = "/sdcard/Test/";
-
-                    try{
-                        File new_file = new File(path, "main2.txt");
-                        if (!new_file.exists()){
-                            //if file doesn't exist, create a file.
-                            new_file.createNewFile();
-                            Log.d("BACK","CREATE a new FILE");
-                        }
-                        FileOutputStream fos = new FileOutputStream(new_file);
-                        fos.write("aabbbccc".getBytes());
-                        fos.close();
-                    }catch(IOException e){
-                        e.printStackTrace();
-                    }
-                }
 
                 if (dest_IP.equals("") || dest_port==-1||key.equals("")||fo_name.equals("")){
                     Toast.makeText(getApplicationContext(),"Fill in Everything",Toast.LENGTH_SHORT).show();
@@ -224,14 +203,12 @@ class SendTask extends AsyncTask<Void, Void, Void>{
             if (!mode) {
                 op = 1;//decryption
             }
-            op = Short.reverseBytes(op);//same as htons
             headerBuffer.putShort(op);
             short checksum = 0; //2 byte checksum
             headerBuffer.putShort(checksum);
             headerBuffer.put(key.getBytes());
             long length = HEADER_SIZE+input_size;
             Log.d("size","size of header is :"+length);
-            length = Long.reverseBytes(length);//htonl length
             headerBuffer.putLong(length);
 
             //checksum calculation
@@ -266,11 +243,8 @@ class SendTask extends AsyncTask<Void, Void, Void>{
             InputStream inputStream = socket.getInputStream();
             //read header first
             byte[] data = new byte[1024000];
-            int read;
-            int read_bytes = 0;
-            while((read=inputStream.read(data))!=-1){
-                read_bytes += read;
-            }
+            int read_bytes;
+            read_bytes = inputStream.read(data);
 
             //make file
             String path = "/sdcard/Test/";
@@ -289,12 +263,7 @@ class SendTask extends AsyncTask<Void, Void, Void>{
             MediaScannerConnection.scanFile(mContext, new String[]{Environment.getExternalStorageDirectory().getAbsolutePath()+filename}, null, null);
             FileOutputStream fos = new FileOutputStream(new_file);
             fos.write(data,0,read_bytes);
-//            fos.write(input_data,0, input_size);
-            Log.d("HELLOWORLD",data.toString());
             Log.d("XXX",""+new_file.length()+"\nREAD : "+read_bytes);
-
-            //check header
-            chkvalue = getChecksum(data);
 
             fos.close();
 
@@ -318,6 +287,6 @@ class SendTask extends AsyncTask<Void, Void, Void>{
     @Override
     protected void onPostExecute(Void result){
         super.onPostExecute(result);
-        Toast.makeText(mContext, "Connection OKAY HOST \nChecksum of is :" +chkvalue, Toast.LENGTH_SHORT).show();
+        Toast.makeText(mContext, "Connection Finished\nResult written in "+filename +chkvalue, Toast.LENGTH_SHORT).show();
     }
         }
