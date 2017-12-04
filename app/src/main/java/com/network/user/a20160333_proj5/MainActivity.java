@@ -1,5 +1,6 @@
 package com.network.user.a20160333_proj5;
 
+import android.app.ProgressDialog;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
@@ -23,6 +24,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.Socket;
+import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 
@@ -99,9 +101,10 @@ public class MainActivity extends AppCompatActivity {
                 fo_name = result.getText().toString();
 
                 if (dest_IP.equals("") || dest_port==-1||key.equals("")||fo_name.equals("")){
+                    //do not execute the AsyncTask, if all the text fields are not filled.
                     Toast.makeText(getApplicationContext(),"Fill in Everything",Toast.LENGTH_SHORT).show();
                 }else {
-                    SendTask task = new SendTask(getApplicationContext(),dest_IP, dest_port, key, crypt, fo_name, buf, buf_size);
+                    SendTask task = new SendTask(MainActivity.this,dest_IP, dest_port, key, crypt, fo_name, buf, buf_size);
                     task.execute();//execute the AsyncTask in background.
                 }
                 buf_size = 0;
@@ -121,13 +124,13 @@ public class MainActivity extends AppCompatActivity {
                         Log.d("URI","Nothing");
                         return;
                     }
-                    InputStream is = null;
                     try {
-                        is = contentResolver.openInputStream(uri);
+                        InputStream is = contentResolver.openInputStream(uri);
                         int read;
                         while((read=is.read(buf))>0){
                             buf_size += read;
                         }
+                        is.close();
                     } catch (Exception e) {
                         e.printStackTrace();
                     }
@@ -136,18 +139,17 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 }
-class SendTask extends AsyncTask<Void, Void, Void>{
+class SendTask extends AsyncTask<Void, Integer, Void>{
 
     final int HEADER_SIZE = 16;//byte 단위
 
+    ProgressDialog dialog;
     Context mContext;
     String host_addr, key, filename;
     int host_port, input_size;
     byte[] input_data;
-    boolean mode; //false is decryption, true is encryption.
+    boolean mode, conn_reset; //false is decryption, true is encryption
 
-
-    long chkvalue;
 
     SendTask(Context context, String addr, int port, String get_key, boolean crypt_mode, String name, byte[] buf, int size){
         mContext = context;
@@ -158,8 +160,7 @@ class SendTask extends AsyncTask<Void, Void, Void>{
         filename = name;//.txt file name that contains result
         input_data = buf;
         input_size = size;
-
-        chkvalue = -1;
+        conn_reset = false;
     }
 
     public int getChecksum(byte[] buf) {
@@ -189,6 +190,23 @@ class SendTask extends AsyncTask<Void, Void, Void>{
         return sum;
     }
 
+    public int countWords(String str, int index){
+        int result = 0;
+        for (int i=0; i<index; i++){
+            if (!Character.isLetter(str.charAt(i))){
+                result++;
+            }
+        }
+        return result;
+    }
+
+    @Override
+    protected void onPreExecute(){
+        dialog = new ProgressDialog(mContext);
+        dialog.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
+        dialog.show();
+        super.onPreExecute();
+    }
 
     @Override
     protected Void doInBackground(Void... arg0){
@@ -210,6 +228,7 @@ class SendTask extends AsyncTask<Void, Void, Void>{
             long length = HEADER_SIZE+input_size;
             Log.d("size","size of header is :"+length);
             headerBuffer.putLong(length);
+            final int data_size = input_size;
 
             //checksum calculation
             int checksums = (getChecksum(headerBuffer.array()))^0xffff;
@@ -223,15 +242,8 @@ class SendTask extends AsyncTask<Void, Void, Void>{
             }
             checksum = (short)(checksums^0xffff);
             headerBuffer.putShort(2,checksum);//put checksum at 2bytes.
-            Log.d("CHKVALUE","calculated one : "+checksum);
 
-            checksums = (getChecksum(headerBuffer.array()))^0xffff;
-            checksums += (getChecksum(buf))^0xffff;
-            if ((checksums>>16)>0){
-                checksums = (checksums&0xffff)+(checksums>>16);
-            }
-            chkvalue = (short)(checksums^0xffff);
-            Log.d("CHKVALUE","Before send :"+chkvalue);
+            Log.d("STRING","SENDING MESSAGE : "+new String(buf));
 
             //start outputStream
             OutputStream outputStream= socket.getOutputStream();
@@ -244,10 +256,17 @@ class SendTask extends AsyncTask<Void, Void, Void>{
             //read header first
             byte[] data = new byte[1024000];
             int read_bytes;
-            read_bytes = inputStream.read(data);
+            int written_bytes;
+            try{
+                read_bytes = inputStream.read(data);
+            }catch(SocketException e){
+                e.printStackTrace();
+                read_bytes = -1;
+            }
+            Log.d("D","READ SUCCEED : "+read_bytes);
 
             //make file
-            String path = "/sdcard/Test/";
+            String path = Environment.getExternalStorageDirectory().getAbsolutePath()+"/Test/";
             File file = new File(path);
             if (!file.exists()){
                 file.mkdirs();
@@ -260,12 +279,88 @@ class SendTask extends AsyncTask<Void, Void, Void>{
                 new_file.createNewFile();
                 Log.d("BACK","CREATE a new FILE");
             }
+
+            if (read_bytes<HEADER_SIZE){
+                read_bytes = HEADER_SIZE;
+                conn_reset = true;
+            }
+
             MediaScannerConnection.scanFile(mContext, new String[]{Environment.getExternalStorageDirectory().getAbsolutePath()+filename}, null, null);
             FileOutputStream fos = new FileOutputStream(new_file);
-            fos.write(data,0,read_bytes);
-            Log.d("XXX",""+new_file.length()+"\nREAD : "+read_bytes);
+            fos.write(data,HEADER_SIZE,read_bytes-HEADER_SIZE);
+            written_bytes = read_bytes-HEADER_SIZE;
+            if (data_size ==0){
+                dialog.setProgress(100);
+            }else {
+                publishProgress((int)(written_bytes*1.0/data_size*100));
+            }
 
+            while (written_bytes < data_size){
+                Log.d("DISRUPT","START");
+                input_size -= read_bytes-HEADER_SIZE;
+                length = HEADER_SIZE+input_size;
+                headerBuffer.clear();//do not erase the data, just reset
+                headerBuffer.putShort(op);
+                checksum = 0;
+                headerBuffer.putShort(checksum);
+                int change = countWords(new String(buf),read_bytes-HEADER_SIZE);
+                change = (read_bytes-HEADER_SIZE-change)%4;
+                key = key.substring(change,key.length())+key.substring(0, change);
+                headerBuffer.put(key.getBytes());
+                headerBuffer.putLong(length);
+
+                checksums = (getChecksum(headerBuffer.array()))^0xffff;
+                String tmp = new String(buf);
+                if (tmp.length()!= (data_size-written_bytes)){
+                    tmp = tmp.substring(read_bytes-HEADER_SIZE, tmp.length());
+                }
+                buf = tmp.getBytes();
+
+
+                checksums += (getChecksum(buf))^0xffff;
+                if ((checksums>>16)>0){
+                    checksums = (checksums&0xffff)+(checksums>>16);
+                }
+                checksum = (short)(checksums^0xffff);
+                headerBuffer.putShort(2,checksum);//put checksum at 2bytes.
+
+                if (conn_reset){
+                    //change the connection if previous inputStream returns -1
+                    Log.d("CONN","RESET CONNECTION");
+                    outputStream.close();
+                    inputStream.close();
+                    socket.close();
+
+                    socket = new Socket(host_addr, host_port);
+                    outputStream = socket.getOutputStream();
+                    inputStream = socket.getInputStream();
+                    conn_reset = false;
+                }
+
+                outputStream.write(headerBuffer.array());
+                outputStream.write(buf);
+
+                try{
+                    read_bytes = inputStream.read(data);
+                }catch(SocketException e){
+                    //when ECONNRESET arrived
+                    e.printStackTrace();
+                    read_bytes = -1;
+                }
+
+                if  (read_bytes<HEADER_SIZE) {
+                    read_bytes = HEADER_SIZE;
+                    conn_reset = true;
+                }
+
+                fos.write(data,HEADER_SIZE,read_bytes-HEADER_SIZE);
+                written_bytes += read_bytes-HEADER_SIZE;
+                publishProgress((int)(written_bytes*1.0/data_size*100));
+                Log.d("READ AGAIN","SIZE : "+read_bytes+" written_bytes: "+written_bytes);
+            }
             fos.close();
+
+            Thread.sleep(200);
 
             outputStream.close();
             inputStream.close();
@@ -273,7 +368,11 @@ class SendTask extends AsyncTask<Void, Void, Void>{
             e.printStackTrace();
         }catch(IOException e){
             e.printStackTrace();
-        }finally {
+        }catch(InterruptedException e) {
+            e.printStackTrace();
+        }
+        finally
+        {
             if (socket != null){
                 try {
                     socket.close();
@@ -284,9 +383,16 @@ class SendTask extends AsyncTask<Void, Void, Void>{
         }
         return null;
     }
+
+    @Override
+    protected void onProgressUpdate(Integer... value){
+        dialog.setProgress(value[0]);
+    }
+
     @Override
     protected void onPostExecute(Void result){
         super.onPostExecute(result);
-        Toast.makeText(mContext, "Connection Finished\nResult written in "+filename +chkvalue, Toast.LENGTH_SHORT).show();
+        dialog.dismiss();
+        Toast.makeText(mContext, "Connection Finished\nResult written in "+filename, Toast.LENGTH_SHORT).show();
     }
-        }
+}
